@@ -8589,3 +8589,921 @@ Protect critical state on backend
         ↓
 Test out-of-order completion
 ```
+
+---
+
+# 49. Trade-offs — Principal/Senior Interview Layer
+
+> **Interview rule:** At senior/principal level, do not stop at “what is it?”.
+> Explain **why you chose it, what you gain, what you sacrifice, and when you would choose the alternative**.
+
+## 49.1 JavaScript Fundamentals
+
+| Topic | Main benefit | Trade-off / cost | Choose when |
+|---|---|---|---|
+| `const` | Prevents reassignment; communicates intent | Does not make objects immutable | Default for most variables |
+| `let` | Block scoped and reassignable | Mutable state can increase complexity | Value must change |
+| Closures | Encapsulation and state | Can retain references longer than expected | Private state, factories, callbacks |
+| Classes | Familiar OO syntax | Can hide prototype mechanics / encourage deep inheritance | Domain objects and clear OO models |
+| Prototype composition | Flexible reuse | Can be harder to reason about | Lightweight object composition |
+| `map()` | Declarative transformation | Creates a new array | Transform every item |
+| `forEach()` | Simple side effects | No transformed result; harder to compose | Side effects only |
+| `reduce()` | Very flexible aggregation | Can become difficult to read | Aggregation/grouping |
+| `structuredClone()` | Robust deep cloning for supported values | Copies can be expensive; not every object is cloneable | Data cloning where supported |
+
+### Interview trade-off sentence
+
+> “I would prefer the simplest construct that communicates intent; flexibility is useful, but unnecessary abstraction increases cognitive and maintenance cost.”
+
+---
+
+# 50. JavaScript Async / Event Loop
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Promise | Simple one-shot async result | Cancellation is not inherent |
+| `async/await` | Sequential-looking readable code | Can hide concurrency if used carelessly |
+| `Promise.all()` | Parallel execution and fail-fast behavior | One rejection rejects the aggregate |
+| `Promise.allSettled()` | Gives outcome of every operation | Caller must handle failures individually |
+| `Promise.race()` | Reacts to first settled operation | Losing operations continue unless explicitly cancelled |
+| `Promise.any()` | First successful result | All failures produce `AggregateError` |
+| `AbortController` | Explicit cancellation | Every operation/API must support cancellation correctly |
+| Microtasks | Fast follow-up processing | Large microtask chains can delay rendering/tasks |
+
+### Key trade-off
+
+```text
+Parallelism → faster
+Parallelism → more concurrency + more race-condition risk
+```
+
+---
+
+# 51. TypeScript Fundamentals
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| `interface` | Excellent object contract and extension | Less expressive for some advanced type composition |
+| `type` | Powerful unions/intersections/aliases | Can become complex if overused |
+| `unknown` | Type-safe handling of unknown data | Requires narrowing |
+| `any` | Fast and flexible | Removes compile-time safety |
+| `enum` | Named runtime representation | Adds runtime semantics and can be heavier than unions |
+| Union type | Precise and lightweight | Large unions can become verbose |
+| Strict mode | Catches more defects early | Requires more precise code and migration effort |
+
+### Principal-level rule
+
+```text
+More type safety
+      ↑
+      │
+more compiler constraints
+      ↓
+less runtime surprise
+```
+
+The goal is not “maximum types”; it is **useful compile-time guarantees without making the model unnecessarily complicated**.
+
+---
+
+# 52. Advanced TypeScript
+
+| Technique | Benefit | Trade-off |
+|---|---|---|
+| Generics | Reusable type-safe abstractions | Can become difficult to understand |
+| Conditional types | Very expressive derived types | Poor readability when deeply nested |
+| Mapped types | Avoid duplicate type definitions | Compiler errors can become complex |
+| Discriminated unions | Excellent exhaustive modeling | Requires consistent discriminant design |
+| Utility types | Reuse built-in transformations | Over-composition can obscure the final type |
+| Type guards | Runtime validation + type narrowing | Validation logic must stay correct |
+| `satisfies` | Validates shape while preserving precise type | Requires familiarity with TypeScript type inference |
+
+### Trade-off example
+
+```text
+Simple explicit type
+      ↓
+easy to read
+      ↓
+more duplication
+
+Advanced generic type
+      ↓
+less duplication
+      ↓
+more cognitive complexity
+```
+
+---
+
+# 53. RxJS Fundamentals
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Observable | Handles streams over time | Higher learning curve |
+| Promise | Simple one-shot async flow | Less suitable for multi-value streams |
+| Lazy Observable | Work starts on subscription | Can surprise developers expecting eager execution |
+| Subscription | Explicit lifecycle control | Manual subscriptions can cause leaks |
+| `async` pipe | Automatic Angular subscription lifecycle | Less control for imperative workflows |
+| Operators | Composable async logic | Long pipelines can become difficult to debug |
+
+### Key trade-off
+
+```text
+RxJS gives powerful composition
+        ↓
+but
+        ↓
+powerful composition can become complex
+```
+
+---
+
+# 54. RxJS Transformation / Filtering
+
+| Operator | Benefit | Trade-off |
+|---|---|---|
+| `map` | Clear transformation | Creates transformed stream values |
+| `filter` | Declarative selection | Values not passing predicate disappear |
+| `scan` | Stateful stream accumulation | State exists inside the stream |
+| `reduce` | Final aggregation | Waits for completion |
+| `tap` | Excellent debugging/side effects | Business logic inside it reduces clarity |
+| `distinctUntilChanged` | Prevents duplicate work | Equality is usually reference/simple comparison unless customized |
+| `take` | Automatic completion | Stops listening after N values |
+| `takeUntil` | Lifecycle cancellation | Requires a correctly managed notifier |
+
+---
+
+# 55. RxJS Higher-Order Mapping
+
+## The four-way trade-off
+
+| Operator | Concurrency | Cancellation | Ordering | Typical use |
+|---|---:|---|---|---|
+| `switchMap` | 1 active | Yes | Latest wins | Search |
+| `mergeMap` | Many | No automatic cancellation of previous inner streams | No guaranteed order | Parallel work |
+| `concatMap` | 1 at a time | No replacement | Preserved | Sequential saves |
+| `exhaustMap` | 1 active | Ignores new source values | First wins while busy | Submit/login |
+
+### Decision diagram
+
+```text
+                 New source value arrives
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+          Need latest?  Need every?  Ignore while busy?
+              │            │            │
+          switchMap    ┌────┴────┐    exhaustMap
+                       │         │
+                  order needed?  no
+                       │         │
+                   concatMap  mergeMap
+```
+
+### Critical trade-off
+
+```text
+switchMap:
+freshness ↑
+wasted work ↓
+but previous operation may be cancelled
+
+mergeMap:
+throughput ↑
+but concurrency/race risk ↑
+
+concatMap:
+ordering ↑
+predictability ↑
+but latency/queue length ↑
+
+exhaustMap:
+duplicate action prevention ↑
+but legitimate new actions may be ignored
+```
+
+---
+
+# 56. RxJS Combination Operators
+
+| Operator | Benefit | Trade-off |
+|---|---|---|
+| `combineLatest` | Reacts to latest state from multiple streams | Every source must emit once before first output |
+| `forkJoin` | Simple “wait for all” aggregation | Requires completion; unsuitable for never-ending streams |
+| `zip` | Deterministic positional pairing | Can wait indefinitely for a matching value |
+| `withLatestFrom` | Clear trigger + supporting state | Secondary stream must have emitted |
+| `merge` | Immediate interleaving | Source ordering is not preserved globally |
+| `concat` | Preserves source order | Later sources wait for previous completion |
+
+---
+
+# 57. Subjects / Multicasting
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Subject | Simple multicast event channel | No current value for late subscribers |
+| BehaviorSubject | Current value available immediately | Requires initial value; state semantics can become ambiguous |
+| ReplaySubject | Replays history | Memory usage can grow |
+| AsyncSubject | Only final value | Useful only for specific completion-based workflows |
+| `share()` | Avoids duplicate subscriptions | Shared lifecycle depends on subscribers |
+| `shareReplay()` | Excellent caching/replay | Incorrect configuration can retain data or subscriptions longer than intended |
+
+### Memory trade-off
+
+```text
+Replay more history
+      ↓
+more convenience
+      ↓
+more memory / lifecycle responsibility
+```
+
+---
+
+# 58. RxJS Error Handling
+
+| Strategy | Benefit | Trade-off |
+|---|---|---|
+| `catchError` fallback | Keeps UI usable | Can hide real failures if overused |
+| `retry` | Handles transient failures | Can multiply server load |
+| `retryWhen` | Fine-grained retry policy | More complex |
+| `finalize` | Reliable cleanup | Does not transform/recover errors |
+| Rethrow | Preserves failure visibility | Requires downstream handling |
+
+### Retry rule
+
+```text
+Transient failure → retry can help
+Permanent failure → retry wastes time/resources
+```
+
+For writes, always consider **idempotency** before automatic retries.
+
+---
+
+# 59. RxJS Timing / Search
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| `debounceTime` | Reduces calls after bursty input | Adds intentional delay |
+| `throttleTime` | Limits event frequency | Intermediate values may be missed |
+| `auditTime` | Useful for periodic sampling | Response is delayed until window boundary |
+| `switchMap` | Prevents stale search results | Cancels previous operation |
+
+### Search trade-off
+
+```text
+debounce too low → too many requests
+debounce too high → sluggish UX
+```
+
+Choose the delay according to UX and backend capacity rather than memorizing one universal number.
+
+---
+
+# 60. Angular Fundamentals
+
+| Architectural choice | Benefit | Trade-off |
+|---|---|---|
+| Standalone components | Less module ceremony; clearer local dependencies | Requires migration/modern Angular familiarity |
+| NgModules | Mature ecosystem and legacy compatibility | More indirection and configuration |
+| Services | Simple dependency-based reuse | Can become “god services” |
+| Components | Encapsulated UI behavior | Large components become difficult to test/maintain |
+
+---
+
+# 61. Angular Templates & Binding
+
+| Binding | Benefit | Trade-off |
+|---|---|---|
+| Interpolation | Simple text rendering | Not appropriate for every property |
+| Property binding | Direct DOM/component property binding | Can become noisy for many dynamic properties |
+| Event binding | Clear user interaction | Excessive event logic in templates hurts maintainability |
+| Two-way binding | Convenient for simple forms/components | Can hide data-flow direction |
+
+### Rule
+
+```text
+Simple UI state → two-way binding can be convenient
+Complex state → explicit one-way flow is easier to reason about
+```
+
+---
+
+# 62. Angular Components & Communication
+
+| Approach | Benefit | Trade-off |
+|---|---|---|
+| `input()` | Explicit parent → child contract | Still creates coupling between parent/child |
+| `output()` | Clear child → parent event contract | Deep event chains can become cumbersome |
+| `model()` | Convenient two-way component API | Can hide ownership of state |
+| Shared service | Simple sibling/unrelated communication | State ownership can become unclear |
+| NgRx | Centralized predictable state | More ceremony |
+
+### Rule
+
+Use the **least powerful state mechanism that solves the problem cleanly**.
+
+---
+
+# 63. Angular Lifecycle
+
+| Approach | Benefit | Trade-off |
+|---|---|---|
+| `ngOnInit` | Clear initialization point | Can become overloaded |
+| `ngOnChanges` | Reacts to input changes | Complex input-driven logic can become hard to follow |
+| `ngDoCheck` | Custom change detection hooks | Can be expensive |
+| `ngAfterViewInit` | Safe access to initialized view | Too much logic here can cause timing problems |
+| `ngOnDestroy` | Cleanup | Manual cleanup is easy to forget |
+
+Prefer reactive primitives where they make the lifecycle logic simpler.
+
+---
+
+# 64. Angular Dependency Injection
+
+| Scope | Benefit | Trade-off |
+|---|---|---|
+| Root provider | Singleton-like application-wide service | Shared mutable state can become global coupling |
+| Component provider | Isolated instance/state | More instances and different lifetimes |
+| Environment injector | Flexible scoped provisioning | Adds architectural complexity |
+| `useFactory` | Dynamic construction | Factory dependencies/logic can become complex |
+
+### Trade-off
+
+```text
+Broader scope → easier sharing
+Broader scope → stronger coupling
+Narrower scope → better isolation
+Narrower scope → harder sharing
+```
+
+---
+
+# 65. Angular Directives
+
+| Approach | Benefit | Trade-off |
+|---|---|---|
+| Attribute directive | Reusable behavior | Behavior can be hidden from template readers |
+| Structural directive | Powerful template composition | More difficult to debug than simple markup |
+| Directive Composition API | Reuse behavior cleanly | Adds abstraction |
+
+---
+
+# 66. Template Primitives / Dynamic Components
+
+| Technique | Benefit | Trade-off |
+|---|---|---|
+| `ng-container` | No extra DOM node | Less visible structure in DOM |
+| `ng-template` | Lazy/reusable template | Indirect rendering model |
+| `ng-content` | Strong component composition | Parent/child content boundaries can become complex |
+| `ViewContainerRef` | Dynamic UI | Runtime complexity and lifecycle management |
+
+---
+
+# 67. Angular Pipes
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Pure pipe | Efficient and predictable | Only reacts to relevant input changes |
+| Impure pipe | Can react to mutable state | Potentially executes very frequently |
+| AsyncPipe | Automatic subscription management | Less control than manual subscription |
+
+Prefer pure pipes whenever possible.
+
+---
+
+# 68. Angular Forms
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Template-driven | Simple forms, less code | Harder to scale and test for complex forms |
+| Reactive forms | Explicit, testable, scalable | More code/boilerplate |
+| FormArray | Dynamic repeated controls | Complex nested forms can become verbose |
+| Async validators | Server-backed validation | Adds latency and API load |
+
+### Rule
+
+```text
+Small/simple form → template-driven may be enough
+Complex/dynamic/enterprise form → reactive forms usually provide better control
+```
+
+---
+
+# 69. ControlValueAccessor
+
+| Approach | Benefit | Trade-off |
+|---|---|---|
+| CVA | Custom component behaves like native Angular form control | More implementation complexity |
+| `@Input/@Output` | Very simple API | Does not naturally participate in Angular Forms |
+
+Use CVA when the component **is semantically a form control**.
+
+---
+
+# 70. Angular Routing
+
+| Feature | Benefit | Trade-off |
+|---|---|---|
+| Lazy loading | Smaller initial bundle | First navigation may incur loading latency |
+| Route guards | Centralized navigation rules | Guards are not backend security |
+| Resolvers | Data available before component activation | Can delay navigation |
+| Preloading | Faster subsequent navigation | Uses bandwidth earlier |
+| `canMatch` | Prevents route matching/loading | Requires careful route design |
+
+### Trade-off
+
+```text
+Preload more
+→ navigation feels faster
+→ bandwidth/network usage increases
+```
+
+---
+
+# 71. Angular HTTP
+
+| Strategy | Benefit | Trade-off |
+|---|---|---|
+| Interceptor | Centralized cross-cutting behavior | Too much logic creates hidden behavior |
+| Retry | Resilient transient failures | Can amplify traffic |
+| Cache | Faster reads / lower API load | Stale data / invalidation complexity |
+| Optimistic UI | Excellent perceived performance | Rollback/conflict handling required |
+| Request deduplication | Avoids duplicate work | Cache/lifecycle complexity |
+
+---
+
+# 72. Authentication & Security
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| HttpOnly cookie | JS cannot directly read token; reduces token theft via XSS | Requires CSRF/SameSite/CORS design |
+| localStorage token | Easy to implement | Accessible to JavaScript; XSS impact is significant |
+| Access + refresh tokens | Shorter-lived access credentials | Refresh lifecycle is more complex |
+| Client route guard | Better UX | Not a security boundary |
+| Backend authorization | Real security boundary | Must be consistently implemented |
+
+### Security principle
+
+```text
+Frontend security controls UX
+Backend security controls authorization
+```
+
+---
+
+# 73. Angular Change Detection
+
+| Strategy | Benefit | Trade-off |
+|---|---|---|
+| Default | Simple mental model | Potentially more checking |
+| OnPush | Better predictability/performance | Requires correct immutable/reactive patterns |
+| Manual `detectChanges()` | Precise control | Easy to create timing/maintenance problems |
+| `detach()` | Maximum control for special cases | Component can become stale if not reattached/updated correctly |
+
+---
+
+# 74. Angular Signals
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Signals | Simple synchronous reactive state | Not a replacement for every asynchronous stream use case |
+| `computed()` | Efficient derived state | Should remain derivation, not side-effect logic |
+| `effect()` | External side effects | Overuse can create hidden reactive chains |
+| `toSignal()` | Easy Observable → signal bridge | Must understand subscription/lifecycle behavior |
+| RxJS | Excellent async/event composition | More concepts/operators |
+| NgRx | Strong global state architecture | More ceremony and indirection |
+
+### Decision
+
+```text
+Local synchronous UI state → Signals
+Async streams/events       → RxJS
+Large shared domain state  → NgRx when its guarantees are valuable
+```
+
+---
+
+# 75. Angular Control Flow
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| `@if` / `@for` | Modern readable template control flow | Requires current Angular knowledge |
+| `track` | Better DOM reuse | Incorrect identity tracking can produce UI bugs |
+| Legacy structural directives | Familiar in older codebases | More syntax/indirection |
+
+---
+
+# 76. `@defer`
+
+| Benefit | Trade-off |
+|---|---|
+| Reduces initial work and bundle pressure | Deferred content can appear later |
+| Improves initial loading for non-critical UI | More loading/placeholder states to design |
+| Can load expensive widgets on demand | Poor trigger choice can create delayed UX |
+
+### Rule
+
+Defer **non-critical** UI, not content required for the first meaningful interaction.
+
+---
+
+# 77. Angular Zone / Rendering
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Zone-based | Familiar automatic async integration | Can perform broader scheduling/checking |
+| `runOutsideAngular()` | Reduces unnecessary Angular work | Developer must explicitly re-enter when UI needs updating |
+| Zoneless | More explicit/reactive model | Requires understanding of rendering triggers and application architecture |
+
+---
+
+# 78. Angular Performance
+
+| Optimization | Benefit | Trade-off |
+|---|---|---|
+| Lazy loading | Smaller initial bundle | More network requests/navigation latency |
+| `@defer` | Delays non-critical work | Content is intentionally delayed |
+| OnPush | Less unnecessary checking | Requires disciplined data flow |
+| Signals | Fine-grained reactive updates | New mental model |
+| Virtual scrolling | Handles huge lists efficiently | More complex scrolling/layout behavior |
+| Web Workers | Frees main thread | Serialization/message overhead |
+| Memoization | Avoids repeated computation | Memory usage + invalidation complexity |
+| Image optimization | Faster page | Build/CDN/image pipeline complexity |
+
+### Principal rule
+
+**Measure before optimizing.**
+
+---
+
+# 79. SSR / Hydration
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| SSR | Faster HTML availability + SEO benefits | Server infrastructure and rendering complexity |
+| CSR | Simpler deployment and client model | Initial content may depend heavily on JS |
+| SSG | Excellent cacheability | Less suitable for highly dynamic pages |
+| Hydration | Avoids rebuilding server-rendered UI | Requires server/client markup compatibility |
+| Event replay | Preserves early user interactions | Adds runtime complexity |
+
+---
+
+# 80. Angular Testing
+
+| Test type | Benefit | Trade-off |
+|---|---|---|
+| Unit | Fast, focused feedback | Can miss integration issues |
+| Integration | Tests component/service interaction | Slower and more setup |
+| E2E | Tests real user flows | Slowest and more environment-sensitive |
+| Heavy mocking | Fast isolated tests | Can test mocks rather than reality |
+| Real dependencies | Higher confidence | Slower and less isolated |
+
+### Principle
+
+Use **the lowest-cost test that provides sufficient confidence**.
+
+---
+
+# 81. NgRx
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| NgRx Store | Predictable centralized state | Boilerplate and indirection |
+| Effects | Clear side-effect boundary | More files/concepts |
+| Selectors | Memoized derived state | Selector architecture must remain understandable |
+| Entity | Normalized collections | Adds abstraction |
+| Facade | Hides NgRx details | Can obscure underlying state flow if poorly designed |
+| Optimistic update | Excellent UX | Rollback complexity |
+
+### State-management trade-off
+
+```text
+Local state
+   ↓
+simple
+   ↓
+less coordination
+
+Global state
+   ↓
+strong coordination
+   ↓
+more architecture / ceremony
+```
+
+---
+
+# 82. Angular Architecture
+
+| Architecture | Benefit | Trade-off |
+|---|---|---|
+| Layer-based | Familiar | Feature boundaries become blurred |
+| Feature-based | Strong ownership boundaries | Requires disciplined dependency rules |
+| Smart/presentational | Clear separation | Can create excessive component layers |
+| Facade | Simplifies consumers | Adds another abstraction |
+| Repository | Decouples data access | Can become unnecessary abstraction over simple APIs |
+| Shared library | Reuse | Shared code becomes a coupling point |
+
+### Principal rule
+
+Optimize for **cohesion and ownership**, not folder count.
+
+---
+
+# 83. Dynamic / Plugin Architecture
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| JSON metadata | Runtime configurability | Validation/versioning complexity |
+| Component registry | Controlled extensibility | Registry maintenance |
+| Dynamic components | Flexible composition | Runtime errors are harder to catch at compile time |
+| Plugin isolation | Failure containment | More infrastructure |
+| Allow-listing components | Security and control | Less arbitrary flexibility |
+
+### Key trade-off
+
+```text
+More runtime configurability
+        ↓
+less compile-time certainty
+        ↓
+more validation/testing required
+```
+
+---
+
+# 84. Micro Frontends
+
+| Choice | Benefit | Trade-off |
+|---|---|---|
+| Microfrontend | Independent team/deployment ownership | Distributed complexity |
+| Shared dependencies | Smaller duplication | Version coupling |
+| Independent dependencies | Strong autonomy | Larger bundles / duplicate runtime |
+| Shared global state | Easy cross-app state | Strong coupling |
+| Events/contracts | Loose coupling | More explicit integration work |
+| Module Federation | Runtime composition | Deployment/version/failure complexity |
+| Monolith | Simple deployment/debugging | Large-team coupling |
+| Modular monolith | Strong internal modularity | Less independent deployment |
+
+### Principal decision
+
+Do not adopt microfrontends merely because the application is large.
+
+Use them when **team ownership, independent deployment, organizational boundaries, or runtime composition justify the operational complexity**.
+
+---
+
+# 85. Browser Internals
+
+| Optimization | Benefit | Trade-off |
+|---|---|---|
+| Batch DOM changes | Fewer layouts/paints | Requires more deliberate code |
+| `requestAnimationFrame` | Aligns visual updates with rendering | Only useful for visual work |
+| Web Worker | Keeps CPU work off main thread | Data/message transfer overhead |
+| CSS transforms/compositing | Can reduce expensive layout work | Excessive layers can consume memory |
+
+---
+
+# 86. Web Fundamentals
+
+| Technology | Benefit | Trade-off |
+|---|---|---|
+| HTTP caching | Faster + less network | Staleness/invalidation |
+| CDN | Lower latency and origin load | Cache invalidation/deployment complexity |
+| WebSocket | Bidirectional real-time | Connection lifecycle/scaling complexity |
+| SSE | Simple server → client stream | One-way communication |
+| IndexedDB | Large structured client storage | Async API and schema/versioning complexity |
+| localStorage | Very simple | Synchronous, limited, string-only storage |
+| Service Worker | Offline/cache capabilities | Lifecycle and caching complexity |
+
+---
+
+# 87. Offline-First / IndexedDB
+
+| Strategy | Benefit | Trade-off |
+|---|---|---|
+| Local-first writes | Excellent UX | Conflict/sync complexity |
+| Optimistic synchronization | Fast perceived interaction | Requires reconciliation |
+| Last-write-wins | Simple | Can silently lose changes |
+| Version-based conflict detection | Prevents silent overwrites | Requires conflict resolution UX |
+| Offline queue | Reliable eventual sync | Queue persistence/retry complexity |
+
+---
+
+# 88. API / Backend Integration
+
+| Strategy | Benefit | Trade-off |
+|---|---|---|
+| Pagination | Controls payload size | Multiple requests |
+| Server filtering | Scales better than client filtering | More backend/API work |
+| Client caching | Faster repeated reads | Stale data |
+| Retry | Resilience | Duplicate side effects if operation isn't idempotent |
+| API versioning | Safer evolution | Multiple versions to maintain |
+| Consistent error model | Easier frontend handling | Requires cross-team agreement |
+| Idempotency keys | Safe retryable commands | Storage/implementation complexity |
+
+---
+
+# 89. System Design / Principal-Level
+
+Every design has trade-offs. Explicitly discuss at least these:
+
+```text
+Performance ↔ Cost
+Consistency ↔ Availability
+Simplicity ↔ Flexibility
+Coupling ↔ Reuse
+Centralization ↔ Autonomy
+Latency ↔ Throughput
+Freshness ↔ Cacheability
+Runtime configurability ↔ Compile-time safety
+```
+
+### Principal-level answer pattern
+
+```text
+Requirement
+   ↓
+Constraint
+   ↓
+Option A ── trade-off ── Option B
+   ↓
+Decision
+   ↓
+Why this decision fits this scale/context
+```
+
+### Example
+
+```text
+Need 5M users
+   ↓
+Client rendering becomes expensive
+   ↓
+Option A: load everything
+Option B: paginate + virtualize + cache
+   ↓
+Choose B
+   ↓
+Trade-off: more API/state complexity
+```
+
+---
+
+# 90. Design Patterns / SOLID
+
+| Pattern | Benefit | Trade-off |
+|---|---|---|
+| Singleton | One shared instance | Global state/coupling risk |
+| Factory | Encapsulates object creation | More abstraction |
+| Strategy | Replace algorithms cleanly | More classes/functions |
+| Adapter | Integrates incompatible APIs | Extra translation layer |
+| Repository | Isolates persistence | Can over-abstract simple CRUD |
+| Facade | Simplifies complex subsystem | Can become a god facade |
+| Observer | Loose event notification | Debugging event chains can be difficult |
+| Dependency Inversion | Better testability and flexibility | More abstractions/interfaces |
+
+### SOLID trade-off
+
+SOLID reduces coupling and improves changeability, but **over-applying abstractions can make simple code unnecessarily complex**.
+
+---
+
+# 91. DSA / Coding
+
+For coding problems, trade-offs usually mean:
+
+| Approach | Benefit | Cost |
+|---|---|---|
+| Brute force | Simple and easy to verify | Usually higher time complexity |
+| HashMap | Fast lookup | Extra memory |
+| Sorting | Enables ordered algorithms | O(n log n) cost and may mutate/copy data |
+| Two pointers | O(n) for many ordered problems | Usually requires structure/order |
+| Sliding window | Efficient contiguous-range problems | Problem must satisfy window properties |
+| Stack | Natural nested/history handling | Extra memory |
+| Heap | Efficient top-K | More implementation complexity |
+| Recursion | Elegant decomposition | Stack usage |
+| DP | Avoids repeated work | Memory + state-design complexity |
+
+### Interview expectation
+
+Do not say only:
+
+> “This is O(n), so it is better.”
+
+Say:
+
+> “This reduces time from O(n²) to O(n) by using O(n) additional memory for constant-time average lookup.”
+
+That demonstrates the **time-space trade-off**.
+
+---
+
+# 92. Race Conditions — Trade-offs
+
+| Solution | Benefit | Trade-off |
+|---|---|---|
+| Cancel stale work | Prevents stale results | Work may never finish |
+| `switchMap` | Excellent latest-value semantics | Previous operation is discarded |
+| `concatMap` | Guarantees ordering | Queue can grow and latency increases |
+| `mergeMap` | High throughput | More concurrency/race risk |
+| `exhaustMap` | Prevents duplicate submissions | Legitimate events can be ignored |
+| Request ID | Simple stale-response protection | Requires bookkeeping |
+| Lock | Strong serialization | Reduces concurrency |
+| Optimistic locking | High concurrency | Conflicts must be handled |
+| Pessimistic locking | Strong consistency | Lower concurrency / possible contention |
+| Idempotency key | Safe retries | Requires server-side support |
+
+### The key interview question
+
+Before selecting a solution, ask:
+
+```text
+Do I need:
+latest?
+every result?
+strict order?
+first result only?
+```
+
+That determines much of the correct RxJS strategy.
+
+---
+
+# 93. Universal “Trade-off” Interview Template
+
+Whenever the interviewer asks **“Why did you choose X?”**, answer:
+
+```text
+I chose X because...
+1. Requirement: ______
+2. Benefit: ______
+3. Alternative: ______
+4. Why alternative was not selected: ______
+5. Cost/trade-off: ______
+6. Mitigation: ______
+```
+
+### Example — Signals vs NgRx
+
+```text
+Requirement:
+Local synchronous UI state.
+
+Choice:
+Signals.
+
+Why:
+Simple reactive state with low ceremony.
+
+Alternative:
+NgRx.
+
+Why not:
+The state does not require centralized event history,
+cross-feature coordination, or complex effects.
+
+Trade-off:
+Signals provide fewer centralized architectural guarantees.
+
+Mitigation:
+Keep state local and introduce a store only when ownership/
+coordination requirements justify it.
+```
+
+---
+
+# 94. Final Principal-Level Mental Model
+
+```text
+                    ┌───────────────┐
+                    │ Requirement   │
+                    └───────┬───────┘
+                            ↓
+                    ┌───────────────┐
+                    │ Constraints   │
+                    └───────┬───────┘
+                            ↓
+                 ┌──────────┴──────────┐
+                 ↓                     ↓
+          Option A                  Option B
+                 │                     │
+                 └──────────┬──────────┘
+                            ↓
+                     Trade-offs
+                            ↓
+                    Decision / Choice
+                            ↓
+                    Risks / Mitigation
+                            ↓
+                    Implementation
+                            ↓
+                    Measure / Monitor
+```
+
+**Senior answer:** “I know how to implement it.”
+
+**Principal answer:** “I know why to choose it, what it costs, what can fail, and how I would know whether the decision worked.”
